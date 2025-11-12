@@ -47,7 +47,12 @@ services:
     restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:8080
+        VITE_REALTIME_URL: http://localhost:3001
+
     ports:
       - "4000:80"
     depends_on:

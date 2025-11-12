@@ -1,10 +1,20 @@
+# ===== Stage 1: build =====
 FROM node:18 AS build
 WORKDIR /app
-COPY package.json ./
+
+COPY package*.json ./
 RUN npm install
+
 COPY . .
+
+ARG VITE_API_URL
+ARG VITE_REALTIME_URL
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_REALTIME_URL=$VITE_REALTIME_URL
+
 RUN npm run build
 
+# ===== Stage 2: run =====
 FROM nginx:1.25-alpine
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf

@@ -1,7 +1,13 @@
 import React, {useEffect, useState} from "react";
 import {DragDropContext, Draggable, Droppable} from "react-beautiful-dnd";
+import {io} from "socket.io-client";
 
-const API_URL = `${import.meta.env.VITE_API_URL || "http://localhost:8080"}/api/tasks`;
+const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+const REALTIME_URL = import.meta.env.VITE_REALTIME_URL || "http://localhost:3001";
+
+const API_URL = `${BACKEND_URL}/api/tasks`;
+
+const socket = io(REALTIME_URL);
 
 const columns = {
     TODO: "To Do",
@@ -13,18 +19,37 @@ export default function KanbanBoard() {
     const [tasks, setTasks] = useState([]);
 
     useEffect(() => {
-        fetch('/api/tasks')
+        fetch(API_URL)
             .then((res) => res.json())
-            .then((data) => {
-                // гарантуємо, що tasks буде масивом
-                setTasks(Array.isArray(data) ? data : []);
-            })
+            .then((data) => setTasks(Array.isArray(data) ? data : []))
             .catch((err) => {
-                console.error('Error fetching tasks:', err);
+                console.error("Error fetching tasks:", err);
                 setTasks([]);
             });
+
+        socket.on("task-updated", (updatedTask) => {
+            console.log("Received update:", updatedTask);
+            setTasks((prev) =>
+                prev.map((t) => (t.id === updatedTask.id ? updatedTask : t))
+            );
+        });
+
+        return () => socket.off("task-updated");
     }, []);
 
+    const updateTaskStatus = async (task) => {
+        try {
+            await fetch(`${API_URL}/${task.id}`, {
+                method: "PUT",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(task),
+            });
+
+            socket.emit("task-updated", task);
+        } catch (e) {
+            console.error("Error updating task:", e);
+        }
+    };
 
     const handleDragEnd = (result) => {
         if (!result.destination) return;
@@ -40,18 +65,6 @@ export default function KanbanBoard() {
         });
 
         setTasks(updatedTasks);
-    };
-
-    const updateTaskStatus = async (task) => {
-        try {
-            await fetch(`${API_URL}/${task.id}`, {
-                method: "PUT",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify(task),
-            });
-        } catch (e) {
-            console.error("Error updating task:", e);
-        }
     };
 
     const handleCreateTask = async () => {
